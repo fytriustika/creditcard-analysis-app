@@ -13,48 +13,48 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 
-st.set_option('deprecation.showPyplotGlobalUse', False)
+# --- Page config ---
+st.set_page_config(page_title="Credit Card User Analysis", layout="wide")
+
 st.title("Credit Card User Analysis Dashboard")
 
-# READ DATA FROM GITHUB
+# --- Read data ---
 CSV_URL = "https://raw.githubusercontent.com/fytriustika/creditcard-analysis-app/main/Credit_Card_Dataset.csv"
 data = pd.read_csv(CSV_URL)
 
 st.subheader("Data Preview")
-st.dataframe(data.head())
+st.dataframe(data.head(), use_container_width=True)
 st.write("Jumlah data (baris, kolom):", data.shape)
 st.write("Statistik deskriptif untuk data numerik:")
 st.dataframe(data.describe())
 
-# EDA: Distributions
-numerical_cols = data.select_dtypes(include=['int64', 'float64']).columns.drop(['Defaulted'])
+# --- EDA: Distributions ---
+with st.expander("Lihat distribusi numerik dan kategori"):
+    numerical_cols = data.select_dtypes(include=['int64', 'float64']).columns.drop(['Defaulted'])
+    fig, axes = plt.subplots(len(numerical_cols), 2, figsize=(10, 4*len(numerical_cols)))
+    for i, col in enumerate(numerical_cols):
+        sns.histplot(data[col], kde=True, ax=axes[i,0])
+        axes[i,0].set_title(f'Distribution of {col}')
+        sns.boxplot(x=data[col], ax=axes[i,1])
+        axes[i,1].set_title(f'Box plot of {col}')
+    st.pyplot(fig)
 
-st.subheader("Distribusi dan Box Plot Numerik")
-fig, axes = plt.subplots(len(numerical_cols), 2, figsize=(10, 4*len(numerical_cols)))
-for i, col in enumerate(numerical_cols):
-    sns.histplot(data[col], kde=True, ax=axes[i,0])
-    axes[i,0].set_title(f'Distribution of {col}')
-    sns.boxplot(x=data[col], ax=axes[i,1])
-    axes[i,1].set_title(f'Box plot of {col}')
-st.pyplot(fig)
+    categorical_cols = data.select_dtypes(include=['object']).columns
+    fig, axes = plt.subplots(1, len(categorical_cols), figsize=(5*len(categorical_cols), 5))
+    if len(categorical_cols) == 1:
+        axes = [axes]
+    for i, col in enumerate(categorical_cols):
+        sns.countplot(x=data[col], ax=axes[i])
+        axes[i].set_title(f'Distribution of {col}')
+        axes[i].tick_params(axis='x', rotation=45)
+    st.pyplot(fig)
 
-categorical_cols = data.select_dtypes(include=['object']).columns
-st.subheader("Distribusi Kategori")
-fig, axes = plt.subplots(1, len(categorical_cols), figsize=(5*len(categorical_cols), 5))
-if len(categorical_cols) == 1:
-    axes = [axes]
-for i, col in enumerate(categorical_cols):
-    sns.countplot(x=data[col], ax=axes[i])
-    axes[i].set_title(f'Distribution of {col}')
-    axes[i].tick_params(axis='x', rotation=45)
-st.pyplot(fig)
-
-# Outlier capping
+# --- Outlier capping ---
 for col in ['Annual_Income', 'Credit_Utilization_Ratio']:
     upper_bound = data[col].quantile(0.99)
     data[col] = data[col].clip(upper=upper_bound)
 
-# Feature Engineering
+# --- Feature Engineering ---
 data['Income_Per_Transaction'] = data['Annual_Income'] / data['Total_Transactions_Last_Year'].replace(0, np.nan)
 data['Income_Per_Transaction'].fillna(data['Income_Per_Transaction'].median(), inplace=True)
 data['Avg_Monthly_Spend'] = data['Total_Spend_Last_Year'] / 12
@@ -66,7 +66,7 @@ data['Age_Group'] = pd.cut(data['Age'], bins=[20, 30, 40, 50, 60, 70],
 data['Income_Bracket'] = pd.qcut(data['Annual_Income'], q=5,
                                  labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
 
-# Preprocessing
+# --- Preprocessing: One-hot encode cat, scale num ---
 categorical_features = data.select_dtypes(include=['object', 'category']).columns.tolist()
 if 'Customer_ID' in categorical_features:
     categorical_features.remove('Customer_ID')
@@ -92,7 +92,7 @@ all_preprocessed_columns = numerical_features + list(onehot_columns)
 data_preprocessed = pd.DataFrame(data_preprocessed_array, columns=all_preprocessed_columns, index=data.index)
 data_preprocessed['Defaulted'] = data['Defaulted']
 
-# Feature Selection
+# --- Feature Selection ---
 X = data_preprocessed.drop('Defaulted', axis=1)
 y = data_preprocessed['Defaulted']
 selector = SelectKBest(score_func=f_classif, k=15)
@@ -101,11 +101,11 @@ selected_feature_indices = selector.get_support(indices=True)
 selected_features = X.columns[selected_feature_indices].tolist()
 X_selected_df = X[selected_features]
 
-# Data Splitting
+# --- Data Splitting ---
 X_train, X_test, y_train, y_test = train_test_split(X_selected_df, y, test_size=0.2, random_state=42)
 X_train_split, X_val, y_train_split, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
 
-# MODEL TRAINING
+# --- Model Training ---
 st.subheader("Model Training and Evaluation")
 models = {
     "Logistic Regression": LogisticRegression(),
@@ -131,7 +131,7 @@ st.write(pd.DataFrame(results).T)
 best_model_name = max(results, key=lambda m: results[m]['AUC'])
 st.success(f"Best model on validation set: {best_model_name}")
 
-# Test the best model
+# --- Test the best model ---
 best_model = models[best_model_name]
 y_test_pred = best_model.predict(X_test)
 y_test_proba = best_model.predict_proba(X_test)[:, 1]
