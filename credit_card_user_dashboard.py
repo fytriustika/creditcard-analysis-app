@@ -1,5 +1,3 @@
-# credit_card_user_dashboard.py
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -17,34 +15,24 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 
 st.set_page_config(page_title='Credit Card User Analysis Dashboard', layout='wide')
 
-@st.cache_data
-def load_data():
-    # Upload the file on Streamlit or set the path accordingly
-    # data = pd.read_csv('/content/drive/MyDrive/Credit_Card_Dataset.csv')
-    uploaded_file = st.sidebar.file_uploader("Upload Credit Card Dataset CSV", type="csv")
+def load_data(uploaded_file):
     if uploaded_file is not None:
         data = pd.read_csv(uploaded_file)
         return data
     else:
-        st.warning("Please upload a CSV file to continue.")
         return None
 
 def initial_eda(data):
     st.header("Initial Data Exploration")
     st.write("**Shape of Data (rows, columns):**", data.shape)
-    
     st.write("**First 5 Rows:**")
     st.dataframe(data.head())
-    
     st.write("**Column Data Types:**")
     st.dataframe(pd.DataFrame(data.dtypes, columns=["Type"]))
-    
     st.write("**Missing Values per Column:**")
     st.dataframe(data.isnull().sum())
-    
     st.write("**Unique Values per Column:**")
     st.dataframe(pd.DataFrame({col: data[col].nunique() for col in data.columns}, index=["Unique Values"]).T)
-    
     st.write("**Descriptive Statistics (Numerical):**")
     st.dataframe(data.describe())
 
@@ -209,8 +197,10 @@ def evaluate_on_test(best_model, X_test, y_test):
 
 def main():
     st.title("Credit Card User Analysis & Default Prediction Dashboard")
-    data = load_data()
+    uploaded_file = st.sidebar.file_uploader("Upload Credit Card Dataset CSV", type="csv")
+    data = load_data(uploaded_file)
     if data is None:
+        st.warning("Please upload a CSV file to continue.")
         st.stop()
     st.sidebar.markdown("## Navigation")
     options = [
